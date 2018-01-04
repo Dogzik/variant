@@ -261,27 +261,13 @@ constexpr decltype(auto) get_if(variant<Ts...> const* pv) noexcept
 template <typename T, typename ... Ts>
 constexpr decltype(auto) get_if(variant<Ts...>* pv) noexcept
 {
-	if (!pv)
-	{
-		return nullptr;
-	}
-	else
-	{
-		return pv->get_if<T>();
-	}
+	return (!pv ? nullptr : pv->get_if<T>());
 }
 
 template <typename T, typename ... Ts>
 constexpr decltype(auto) get_if(variant<Ts...> const* pv) noexcept
 {
-	if (!pv)
-	{
-		return nullptr;
-	}
-	else
-	{
-		return pv->get_if<T>();
-	}
+	return (!pv ? nullptr : pv->get_if<T>());
 }
 
 

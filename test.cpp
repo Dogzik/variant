@@ -4,10 +4,10 @@
 int main() {
 	variant<double, char, int> t(5);
 	bool f = t.valueless_by_exception();
-	char* x;
+	int* x;
 	try
 	{
-		x = get_if<1>(&t);
+		x = get_if<int>(&t);
 	}
 	catch (const std::exception& e)
 	{
