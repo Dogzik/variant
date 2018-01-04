@@ -76,17 +76,23 @@ constexpr size_t get_size_v = get_size<T, TAIL...>::value;
 constexpr size_t variant_npos = static_cast<size_t>(-1);
 
 
-template<typename T, typename ... Ts>
-struct type_choser : type_choser<Ts...>
+template<typename T>
+struct single_type
 {
-	using type_choser<Ts...>::f;
 	static T f(T);
 };
 
-template<typename T>
-struct type_choser<T>
+template<typename T, typename ... Ts>
+struct type_choser : single_type<T>, type_choser<Ts...>
 {
-	static T f(T);
+	using type_choser<Ts...>::f;
+	using single_type<T>::f;
+};
+
+template<typename T>
+struct type_choser<T> : single_type<T>
+{
+	using single_type<T>::f;
 };
 
 template<typename U, typename T, typename ... Ts>
@@ -137,4 +143,6 @@ constexpr size_t get_type_ind() noexcept
 
 template<size_t CNT>
 using variant_index_t = std::conditional_t<(CNT < static_cast<size_t>(std::numeric_limits<signed char>::max())), signed char,
-	std::conditional_t<(CNT < static_cast<size_t>(std::numeric_limits<short>::max())), short, int>>;
+						std::conditional_t<(CNT < static_cast<size_t>(std::numeric_limits<short>::max())), short, int>>;
+
+struct no_type;
