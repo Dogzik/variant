@@ -18,60 +18,24 @@ constexpr bool operator==(monostate, monostate) noexcept { return true; }
 constexpr bool operator!=(monostate, monostate) noexcept { return false; }
 
 
+template<typename T, template <typename...> typename TT>
+struct is_specialization : std::false_type {};
+
+template<template <typename...> typename TT, typename ... Ts>
+struct is_specialization<TT<Ts...>, TT> : std::true_type {};
+
+
 template<typename T>
-struct _Is_in_place_index_specialization
+struct is_in_place_index_specialization
 {
 	static constexpr bool value = 0;
 };
 
 template<size_t I>
-struct _Is_in_place_index_specialization<std::in_place_index_t<I>>
+struct is_in_place_index_specialization<std::in_place_index_t<I>>
 {
 	static constexpr bool value = 1;
 };
-
-
-
-constexpr size_t gcd(size_t a, size_t b) {
-	while (b != 0)
-	{
-		size_t t = b;
-		b = a % b;
-		a = t;
-	}
-	return a;
-}
-
-template<typename T, typename ... TAIL>
-struct get_align
-{
-	static constexpr size_t value = (alignof(T)* get_align<TAIL...>::value) / gcd(alignof(T), get_align<TAIL...>::value);
-};
-
-template<typename T>
-struct get_align<T>
-{
-	static constexpr size_t value = alignof(T);
-};
-
-template<typename T, typename ... TAIL>
-constexpr size_t get_align_v = get_align<T, TAIL...>::value;
-
-template<typename T, typename ... TAIL>
-struct get_size
-{
-	static constexpr size_t value = std::max(sizeof(T), get_size<TAIL...>::value);
-};
-
-template<typename T>
-struct get_size<T>
-{
-	static constexpr size_t value = sizeof(T);
-};
-
-template<typename T, typename ... TAIL>
-constexpr size_t get_size_v = get_size<T, TAIL...>::value;
-
 
 constexpr size_t variant_npos = static_cast<size_t>(-1);
 
@@ -227,6 +191,19 @@ struct storage<0, T0, Ts...>
 	~storage() noexcept {}
 };
 
+
+template<size_t I, typename STORAGE, std::enable_if_t<(I == 0), int> = 0>
+decltype(auto) raw_get(STORAGE&& st)
+{
+	return std::forward<STORAGE>(st).head;
+}
+
+template<size_t I, typename STORAGE, std::enable_if_t<(I != 0), int> = 0>
+decltype(auto) raw_get(STORAGE&& st)
+{
+	return raw_get<I - 1>(std::forward<STORAGE>(st).tail);
+}
+
 template<bool triv_destr, typename ... Ts>
 struct destroyable_storage : storage_t<Ts...>
 {
@@ -257,6 +234,25 @@ struct destroyable_storage : storage_t<Ts...>
 		, cur_type(static_cast<index_t>(I))
 	{}
 
+	constexpr base& get_storage() & noexcept
+	{
+		return *this;
+	}
+
+	constexpr const base& get_storage() const & noexcept
+	{
+		return *this;
+	}
+
+	constexpr base&& get_storage() && noexcept
+	{
+		return std::move(*this);
+	}
+
+	constexpr const base&& get_storage() const && noexcept
+	{
+		return std::move(*this);
+	}
 
 	~destroyable_storage() noexcept = default;
 };
@@ -290,6 +286,26 @@ struct destroyable_storage<0, Ts...> : storage_t<Ts...>
 		: base(std::integral_constant<size_t, I>{}, std::forward<Args>(args)...)
 		, cur_type(static_cast<index_t>(I))
 	{}
+
+	constexpr base& get_storage() & noexcept
+	{
+		return *this;
+	}
+
+	constexpr const base& get_storage() const & noexcept
+	{
+		return *this;
+	}
+
+	constexpr base&& get_storage() && noexcept
+	{
+		return std::move(*this);
+	}
+
+	constexpr const base&& get_storage() const && noexcept
+	{
+		return std::move(*this);
+	}
 
 	~destroyable_storage() noexcept
 	{
