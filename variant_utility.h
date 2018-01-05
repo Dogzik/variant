@@ -62,6 +62,21 @@ struct type_choser<T> : single_type<T>
 template<typename U, typename T, typename ... Ts>
 using type_choser_t = decltype(type_choser<T, Ts...>::f(std::declval<U>()));
 
+template<typename U, typename T, typename ... Ts>
+struct is_unique
+{
+	static constexpr size_t value = std::is_same_v<U, T> + is_unique<U, Ts...>::value;
+};
+
+template<typename U, typename T>
+struct is_unique<U, T>
+{
+	static constexpr size_t value = std::is_same_v<U, T>;
+};
+
+template<typename U, typename ... Ts>
+inline constexpr bool is_unique_v = is_unique<U, Ts...>::value == 1;
+
 
 struct bad_variant_access : public std::exception
 {
@@ -167,8 +182,6 @@ struct storage<0, T0, Ts...>
 		storage_t<Ts...> tail;
 	};
 
-	storage(storage const&) = default;
-
 	template<typename ... Args>
 	constexpr explicit storage(std::integral_constant<size_t, 0>, Args&& ... args) noexcept(std::is_nothrow_constructible_v<T0, Args...>)
 		: head(std::forward<Args>(args)...)
@@ -196,10 +209,37 @@ struct storage<0, T0, Ts...>
 };
 
 
+/*template<typename T, typename U, bool f = std::is_const_v<U>>
+struct need_const
+{
+	typedef const T type;
+};
+
+template<typename T, typename U>
+struct need_const<T, U, 0>
+{
+	typedef T type;
+};*/
+
+template<typename T, typename U, bool f = std::is_const_v<U>>
+struct need_const
+{
+	typedef const T type;
+};
+
+template<typename T, typename U>
+struct need_const<T, U, 0>
+{
+	typedef T type;
+};
+
+template<typename T, typename U>
+using need_const_t = typename need_const<T, U>::type;
+
 template<size_t I, typename STORAGE, std::enable_if_t<(I == 0), int> = 0>
 constexpr decltype(auto) raw_get(STORAGE&& st)
 {
-	return std::forward<STORAGE>(st).head;
+	return (std::forward<STORAGE>(st).head);
 }
 
 template<size_t I, typename STORAGE, std::enable_if_t<(I != 0), int> = 0>
