@@ -3,18 +3,28 @@
 #include <variant>
 #include "vld.h"
 using std::string;
+using std::cin;
+using std::cout;
+using std::endl;
+using std::in_place_index_t;
+using std::in_place_type_t;
 
 struct my_struct
 {
 	int x;
 	my_struct() : x(228) {}
+
+	my_struct(my_struct const&) = delete;
 };
 
 int main() {
-	variant<my_struct, char, int> t;
+	variant<string, char, int> t(5);
+	variant<string, char, int> tt(t);
 	//variant<double, int, char> a(5);
 	//variant<double, int, char> b(char(2));
-
+	//cout << t.index() << endl;
+	//cout << std::is_trivially_destructible_v<decltype(t)> << endl;
+	//cout << holds_alternative<string>(t) << endl;
 
 	//bool ff = a < b;
 	//bool f = t.valueless_by_exception();

@@ -36,9 +36,6 @@ struct variant : destroyable_storage_t<T0, Ts...>
 		: variant_base(type_ind<0>{})
 	{}
 
-	variant(const variant&) = delete;
-	variant(variant&&) = delete;
-
 	template<typename T, typename TT = type_choser_t<T, T0, Ts...>,
 		std::enable_if_t<!std::is_same_v<std::decay_t<T>, variant>
 		&& !is_specialization<std::decay_t<T>, std::in_place_type_t>::value
@@ -47,6 +44,24 @@ struct variant : destroyable_storage_t<T0, Ts...>
 	constexpr variant(T&& t) noexcept(std::is_nothrow_constructible_v<TT, T>)
 		: variant_base(type_ind<get_type_ind<TT, T0, Ts...>()>{}, std::forward<T>(t))
 	{}
+
+	template<size_t I, typename ... Args,
+			std::enable_if_t<(I < sizeof...(Ts) + 1), int> = 0
+			, typename TT = variant_alternative_t<I, variant>
+			, std::enable_if_t<(std::is_constructible_v<TT, Args...>), int> = 0>
+	constexpr explicit variant(std::in_place_index_t<I>, Args&&... args)
+		: variant_base(type_ind<I>{}, std::forward<Args>(args)...)
+	{}
+
+	template<typename T, typename ... Args
+			, size_t I = get_type_ind<T, T0, Ts...>()
+			, std::enable_if_t<(I < sizeof...(Ts) + 1) && (std::is_constructible_v<T, Args...>), int> = 0>
+	constexpr explicit variant(std::in_place_type_t<T>, Args&&... args)
+		: variant_base(type_ind<get_type_ind<T, T0, Ts...>()>{}, std::forward<Args>(args)...)
+	{}
+
+	variant(const variant&) = default;
+	variant(variant&&) = default;
 
 	~variant() noexcept = default;
 private:
@@ -106,3 +121,4 @@ constexpr bool holds_alternative(const variant<Us...>& v) noexcept
 		return v.index() == get_type_ind<X, Us...>();
 	}
 }
+

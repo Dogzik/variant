@@ -129,6 +129,8 @@ struct storage<1, T0, Ts...>
 		storage_t<Ts...> tail;
 	};
 
+	storage(storage const&) = default;
+
 	template<typename ... Args>
 	constexpr explicit storage(std::integral_constant<size_t, 0>, Args&& ... args) noexcept(std::is_nothrow_constructible_v<T0, Args...>)
 		: head(std::forward<Args>(args)...)
@@ -165,6 +167,8 @@ struct storage<0, T0, Ts...>
 		storage_t<Ts...> tail;
 	};
 
+	storage(storage const&) = default;
+
 	template<typename ... Args>
 	constexpr explicit storage(std::integral_constant<size_t, 0>, Args&& ... args) noexcept(std::is_nothrow_constructible_v<T0, Args...>)
 		: head(std::forward<Args>(args)...)
@@ -193,46 +197,49 @@ struct storage<0, T0, Ts...>
 
 
 template<size_t I, typename STORAGE, std::enable_if_t<(I == 0), int> = 0>
-decltype(auto) raw_get(STORAGE&& st)
+constexpr decltype(auto) raw_get(STORAGE&& st)
 {
 	return std::forward<STORAGE>(st).head;
 }
 
 template<size_t I, typename STORAGE, std::enable_if_t<(I != 0), int> = 0>
-decltype(auto) raw_get(STORAGE&& st)
+constexpr decltype(auto) raw_get(STORAGE&& st)
 {
 	return raw_get<I - 1>(std::forward<STORAGE>(st).tail);
 }
 
 template<bool triv_destr, typename ... Ts>
-struct destroyable_storage : storage_t<Ts...>
+struct destroyable_storage : protected storage_t<Ts...>
 {
+protected:
 	using index_t = variant_index_t<sizeof...(Ts)>;
 	using base = storage_t<Ts...>;
 
 	index_t cur_type;
 
-	constexpr size_t index() const noexcept
-	{
-		return static_cast<size_t>(cur_type);
-	}
-
 	constexpr void set_index(size_t ind) noexcept
 	{
 		cur_type = static_cast<index_t>(ind);
 	}
-
-	constexpr bool valueless_by_exception() const noexcept
-	{
-		return index() == variant_npos;
-	}
-
 	template<size_t I, typename ... Args>
 	constexpr explicit destroyable_storage(std::integral_constant<size_t, I>, Args&& ... args)
 		noexcept(std::is_nothrow_constructible_v<base, std::integral_constant<size_t, I>, Args...>)
 		: base(std::integral_constant<size_t, I>{}, std::forward<Args>(args)...)
 		, cur_type(static_cast<index_t>(I))
 	{}
+
+public:
+	destroyable_storage(destroyable_storage const&) = default;
+
+	constexpr bool valueless_by_exception() const noexcept
+	{
+		return index() == variant_npos;
+	}
+
+	constexpr size_t index() const noexcept
+	{
+		return static_cast<size_t>(cur_type);
+	}
 
 	constexpr base& get_storage() & noexcept
 	{
@@ -258,34 +265,37 @@ struct destroyable_storage : storage_t<Ts...>
 };
 
 template<typename ... Ts>
-struct destroyable_storage<0, Ts...> : storage_t<Ts...>
+struct destroyable_storage<0, Ts...> : protected storage_t<Ts...>
 {
+protected:
 	using index_t = variant_index_t<sizeof...(Ts)>;
 	using base = storage_t<Ts...>;
 
 	index_t cur_type;
 
-	constexpr size_t index() const noexcept
-	{
-		return static_cast<size_t>(cur_type);
-	}
-
 	constexpr void set_index(size_t ind) noexcept
 	{
 		cur_type = static_cast<index_t>(ind);
 	}
-
-	constexpr bool valueless_by_exception() const noexcept
-	{
-		return index() == variant_npos;
-	}
-
 	template<size_t I, typename ... Args>
 	constexpr explicit destroyable_storage(std::integral_constant<size_t, I>, Args&& ... args)
 		noexcept(std::is_nothrow_constructible_v<base, std::integral_constant<size_t, I>, Args...>)
 		: base(std::integral_constant<size_t, I>{}, std::forward<Args>(args)...)
 		, cur_type(static_cast<index_t>(I))
 	{}
+
+public:
+	destroyable_storage(destroyable_storage const&) = default;
+
+	constexpr bool valueless_by_exception() const noexcept
+	{
+		return index() == variant_npos;
+	}
+
+	constexpr size_t index() const noexcept
+	{
+		return static_cast<size_t>(cur_type);
+	}
 
 	constexpr base& get_storage() & noexcept
 	{
