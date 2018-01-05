@@ -271,3 +271,118 @@ constexpr decltype(auto) get_if(variant<Ts...> const* pv) noexcept
 }
 
 
+template <typename ... Ts>
+constexpr bool operator==(const variant<Ts...>& v, const variant<Ts...>& w)
+{
+	if (v.index() != w.index())
+	{
+		return 0;
+	}
+	if (v.valueless_by_exception())
+	{
+		return 1;
+	}
+	return get<v.index()>(v) == get<v.index()>(w);
+}
+
+template <typename ... Ts>
+constexpr bool operator!=(const variant<Ts...>& v, const variant<Ts...>& w)
+{
+	if (v.index() != w.index())
+	{
+		return 1;
+	}
+	if (v.valueless_by_exception())
+	{
+		return 0;
+	}
+	return get<v.index()>(v) != get<v.index()>(w);
+}
+
+template <typename ... Ts>
+constexpr bool operator<(const variant<Ts...>& v, const variant<Ts...>& w)
+{
+	if (w.valueless_by_exception())
+	{
+		return 0;
+	}
+	if (v.valueless_by_exception())
+	{
+		return 1;
+	}
+	if (v.index() == w.index()) 
+	{
+		return get<v.index()>(v) < get<v.index()>(w);
+	}
+	else
+	{
+		return v.index() < w.index();
+
+	}
+}
+
+template <typename ... Ts>
+constexpr bool operator>(const variant<Ts...>& v, const variant<Ts...>& w)
+{
+	if (v.valueless_by_exception())
+	{
+		return 0;
+	}
+	if (w.valueless_by_exception())
+	{
+		return 1;
+	}
+	if (v.index() == w.index())
+	{
+		return get<v.index()>(v) > get<v.index()>(w);
+	}
+	else
+	{
+		return v.index() > w.index();
+
+	}
+}
+
+template <typename ... Ts>
+constexpr bool operator<=(const variant<Ts...>& v, const variant<Ts...>& w)
+{
+	if (v.valueless_by_exception())
+	{
+		return 1;
+	}
+	if (w.valueless_by_exception())
+	{
+		return 0;
+	}
+	if (v.index() == w.index())
+	{
+		return get<v.index()>(v) <= get<v.index()>(w);
+	}
+	else
+	{
+		return v.index() < w.index();
+
+	}
+}
+
+template <typename ... Ts>
+constexpr bool operator>=(const variant<Ts...>& v, const variant<Ts...>& w)
+{
+	if (w.valueless_by_exception())
+	{
+		return 1;
+	}
+	if (v.valueless_by_exception())
+	{
+		return 0;
+	}
+	if (v.index() == w.index())
+	{
+		return get<v.index()>(v) >= get<v.index()>(w);
+	}
+	else
+	{
+		return v.index() < w.index();
+
+	}
+}
