@@ -198,3 +198,33 @@ constexpr decltype(auto) get(variant<Ts...> const&& v)
 	static_assert(is_unique_v<T, Ts...>, "T has to be unique varriant alternative");
 	return get<I>(std::move(v));
 }
+
+template <size_t I, typename ... Ts>
+constexpr decltype(auto) get_if(variant<Ts...>* pv) noexcept
+{
+	static_assert(I < sizeof...(Ts), "Variant Index out of range");
+	return ((!pv || (pv->index() != I)) ? nullptr : &get<I>(*pv));
+}
+
+template <size_t I, typename ... Ts>
+constexpr decltype(auto) get_if(variant<Ts...> const* pv) noexcept
+{
+	static_assert(I < sizeof...(Ts), "Variant Index out of range");
+	return ((!pv || (pv->index() != I)) ? nullptr : &get<I>(*pv));
+}
+
+template <typename T, typename ... Ts>
+constexpr decltype(auto) get_if(variant<Ts...>* pv) noexcept
+{
+	constexpr size_t I = get_type_ind<T, Ts...>();
+	static_assert(is_unique_v<T, Ts...>, "T has to be unique varriant alternative");
+	return get_if<I>(pv);
+}
+
+template <typename T, typename ... Ts>
+constexpr decltype(auto) get_if(variant<Ts...> const* pv) noexcept
+{
+	constexpr size_t I = get_type_ind<T, Ts...>();
+	static_assert(is_unique_v<T, Ts...>, "T has to be unique varriant alternative");
+	return get_if<I>(pv);
+}

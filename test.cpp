@@ -31,14 +31,15 @@ struct my_struct
 
 int main() {
 	string a = "absss";
-	const variant<int, char, double> t(2.28);
+	variant<int, char, double> t(2.29);
 	cout << t.index() << endl;
 
-	auto&& b = get<2>(move(t));
-
-	double c(move(b));
+	double* c = get_if<double>(&t);
+	//*c = 14.88;
 
 	//variant<string, char, int> tt(t);
 	//cout << std::is_trivially_copyable_v<string> << endl;
+
+	int ppp = 2288;
 	return 0;
 }
