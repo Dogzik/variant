@@ -20,7 +20,10 @@ int main() {
 	//	std::cout << e.what() << std::endl;
 	//}
 
-	storage_t<int, double, string> q(std::integral_constant<size_t, 1>{}, 8);
+	destroyable_storage_t<int, double, string> q(std::integral_constant<size_t, 2>{}, 8, 'a');
 	bool f = std::is_trivially_destructible_v<decltype(q)>;
+
+	destroyable_storage_t<int, double, char> qq(std::integral_constant<size_t, 1>{}, 2.28);
+	bool ff = std::is_trivially_destructible_v<decltype(qq)>;
 	return 0;
 }

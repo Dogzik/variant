@@ -231,6 +231,8 @@ template<bool triv_destr, typename ... Ts>
 struct destroyable_storage : storage_t<Ts...>
 {
 	using index_t = variant_index_t<sizeof...(Ts)>;
+	using base = storage_t<Ts...>;
+
 	index_t cur_type;
 
 	constexpr size_t index() const noexcept
@@ -238,37 +240,64 @@ struct destroyable_storage : storage_t<Ts...>
 		return static_cast<size_t>(cur_type);
 	}
 
+	constexpr void set_index(size_t ind) noexcept
+	{
+		cur_type = static_cast<index_t>(ind);
+	}
+
 	constexpr bool valueless_by_exception() const noexcept
 	{
 		return index() == variant_npos;
 	}
+
+	template<size_t I, typename ... Args>
+	constexpr explicit destroyable_storage(std::integral_constant<size_t, I>, Args&& ... args)
+		noexcept(std::is_nothrow_constructible_v<base, std::integral_constant<size_t, I>, Args...>)
+		: base(std::integral_constant<size_t, I>{}, std::forward<Args>(args)...)
+		, cur_type(static_cast<index_t>(I))
+	{}
+
+
+	~destroyable_storage() noexcept = default;
+};
+
+template<typename ... Ts>
+struct destroyable_storage<0, Ts...> : storage_t<Ts...>
+{
+	using index_t = variant_index_t<sizeof...(Ts)>;
+	using base = storage_t<Ts...>;
+
+	index_t cur_type;
+
+	constexpr size_t index() const noexcept
+	{
+		return static_cast<size_t>(cur_type);
+	}
+
+	constexpr void set_index(size_t ind) noexcept
+	{
+		cur_type = static_cast<index_t>(ind);
+	}
+
+	constexpr bool valueless_by_exception() const noexcept
+	{
+		return index() == variant_npos;
+	}
+
+	template<size_t I, typename ... Args>
+	constexpr explicit destroyable_storage(std::integral_constant<size_t, I>, Args&& ... args)
+		noexcept(std::is_nothrow_constructible_v<base, std::integral_constant<size_t, I>, Args...>)
+		: base(std::integral_constant<size_t, I>{}, std::forward<Args>(args)...)
+		, cur_type(static_cast<index_t>(I))
+	{}
 
 	~destroyable_storage() noexcept
 	{
 		if (!valueless_by_exception())
 		{
-			reset(index());
+			base::reset(index());
 		}
 	}
-};
-
-template<typename ... Ts>
-struct destroyable_storage<1, Ts...> : storage<Ts...>
-{
-	using index_t = variant_index_t<sizeof...(Ts)>;
-	index_t cur_type;
-
-	constexpr size_t index() const noexcept
-	{
-		return static_cast<size_t>(cur_type);
-	}
-
-	constexpr bool valueless_by_exception() const noexcept
-	{
-		return index() == variant_npos;
-	}
-
-	~destroyable_storage() noexcept = default;
 };
 
 template<typename ... Ts>
