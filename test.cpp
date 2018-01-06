@@ -17,18 +17,19 @@ struct my_struct
 	int x;
 	my_struct() : x(228) {}
 
-	my_struct(my_struct const&) = delete;
+	//my_struct(my_struct const&) = delete;
+
+	my_struct(my_struct&&) noexcept(0) {}
 };
+
 
 int main() {
 	string a = "absss";
 	variant<int, char, double, string> t(a);
-	variant<int, char, double, string> tt(t);
-	cout << std::is_copy_constructible_v<variant<int, double>> << endl;
-	cout << std::is_copy_constructible_v<variant<my_struct, double>> << endl;
+	variant<int, char, double, string> tt(move(t));
 
-	string& c = get<3>(t);
-	c = "kek";
+	cout << std::is_nothrow_move_constructible_v<variant<int, char, my_struct>> << endl;
+
 	int ppp = 2288;
 	return 0;
 }

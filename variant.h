@@ -57,9 +57,9 @@ template <typename X, typename ... Us>
 constexpr bool holds_alternative(const variant<Us...>& v) noexcept;
 
 template <typename T0, typename ... Ts>
-struct variant : copy_storage_t<T0, Ts...>
+struct variant : move_storage_t<T0, Ts...>
 {
-	using variant_base = copy_storage_t<T0, Ts...>;
+	using variant_base = move_storage_t<T0, Ts...>;
 
 	template<size_t I>
 	using type_ind = std::integral_constant<size_t, I>;
@@ -102,7 +102,7 @@ struct variant : copy_storage_t<T0, Ts...>
 	{}
 
 	variant(const variant&) = default;
-	variant(variant&&) = delete;
+	variant(variant&&) = default;
 
 	~variant() noexcept = default;
 private:

@@ -187,6 +187,7 @@ struct storage<1, T0, Ts...>
 
 	template<typename STORAGE>
 	void construct_from_storage(size_t ind, STORAGE&& other)
+		noexcept(std::is_nothrow_move_constructible_v<T0> && std::is_nothrow_move_constructible_v<storage_t<Ts...>>)
 	{
 		if (ind == 0)
 		{
@@ -251,7 +252,8 @@ struct storage<0, T0, Ts...>
 	}
 
 	template<typename STORAGE>
-	void construct_from_storage(size_t ind, STORAGE&& other)
+	void construct_from_storage(size_t ind, STORAGE&& other) 
+		noexcept(std::is_nothrow_move_constructible_v<T0> && std::is_nothrow_move_constructible_v<storage_t<Ts...>>)
 	{
 		if (ind == 0)
 		{
@@ -409,6 +411,8 @@ struct copy_storage : destroyable_storage_t<Ts...>
 
 	using copy_base::copy_base;
 
+	copy_storage() = default;
+
 	copy_storage(copy_storage const& other)
 	{
 		copy_base::cur_type = other.cur_type;
@@ -427,8 +431,44 @@ struct copy_storage<0, Ts...> : copy_storage<1, Ts...>
 
 	using copy_base::copy_base;
 
+	copy_storage() = default;
+
 	copy_storage(copy_storage const&) = delete;
 };
 
 template<typename ... Ts>
 using copy_storage_t = copy_storage<std::conjunction_v<std::is_copy_constructible<Ts>...>, Ts...>;
+
+template<bool movable, typename ... Ts>
+struct move_storage : copy_storage_t<Ts...>
+{
+	using move_base = copy_storage_t<Ts...>;
+	
+	using move_base::move_base;
+
+	move_storage(move_storage const&) = default;
+
+	move_storage(move_storage&& other) noexcept(noexcept(move_base::construct_from_storage(other.index(), std::move(other))))
+	{
+		move_base::cur_type = other.cur_type;
+		if (!move_base::valueless_by_exception())
+		{
+			move_base::construct_from_storage(other.index(), std::move(other));
+		}
+	}
+};
+
+template<typename ... Ts>
+struct move_storage<0, Ts...> : move_storage<1, Ts...>
+{
+	using move_base = move_storage<1, Ts...>;
+
+	using move_base::move_base;
+
+	move_storage(move_storage const&) = default;
+
+	move_storage(move_storage&&) = delete;
+};
+
+template<typename ... Ts>
+using move_storage_t = move_storage<std::conjunction_v<std::is_move_constructible<Ts>...>, Ts...>;
