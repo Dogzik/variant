@@ -61,6 +61,11 @@ struct variant : move_storage_t<T0, Ts...>
 {
 	using variant_base = move_storage_t<T0, Ts...>;
 
+	using variant_base::valueless_by_exception;
+	using variant_base::set_index;
+	using variant_base::index;
+	using variant_base::reset;
+
 	template<size_t I>
 	using type_ind = std::integral_constant<size_t, I>;
 
@@ -96,15 +101,46 @@ struct variant : move_storage_t<T0, Ts...>
 
 	template<typename T, typename ... Args
 			, size_t I = get_type_ind<T, T0, Ts...>()
-			, std::enable_if_t<(I < sizeof...(Ts) + 1) && (std::is_constructible_v<T, Args...>), int> = 0>
+			, std::enable_if_t<(I < sizeof...(Ts) + 1) 
+			&& (std::is_constructible_v<T, Args...>)
+			&& is_unique_v<T, T0, Ts...>, int> = 0>
 	constexpr explicit variant(std::in_place_type_t<T>, Args&&... args)
 		: variant_base(type_ind<get_type_ind<T, T0, Ts...>()>{}, std::forward<Args>(args)...)
 	{}
 
 	variant(const variant&) = default;
 	variant(variant&&) = default;
-
 	~variant() noexcept = default;
+
+	template <size_t I, typename ... Args,
+			std::enable_if_t<(I < (sizeof...(Ts) + 1)) 
+			&& std::is_constructible_v<get_type<I>, Args...>, int> = 0,
+			typename TT = get_type<I>>
+	TT& emplace(Args&&... args)
+	{
+		if (valueless_by_exception())
+		{
+			reset(index());
+		}
+		try
+		{
+			new(this) variant(std::in_place_index_t<I>{}, std::forward<Args>(args)...);
+		}
+		catch (...)
+		{
+			set_index(variant_npos);
+		}
+		return raw_get<I>(*this);
+	}
+
+	template <typename T, typename ... Args,
+			std::enable_if_t<is_unique_v<T, T0, Ts...>
+			&& std::is_constructible_v<T, Args...>, int> = 0>
+	T& emplace(Args&&... args)
+	{
+		constexpr size_t I = get_type_ind<T, T0, Ts...>();
+		return emplace<I>(std::forward<Args>(args)...);
+	}
 private:
 	
 };

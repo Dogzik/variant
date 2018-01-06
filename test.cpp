@@ -25,10 +25,9 @@ struct my_struct
 
 int main() {
 	string a = "absss";
-	variant<int, char, double, string> t(a);
-	variant<int, char, double, string> tt(move(t));
+	variant<int, char, double, string> t;
 
-	cout << std::is_nothrow_move_constructible_v<variant<int, char, my_struct>> << endl;
+	t.emplace<string>(8, 'a');
 
 	int ppp = 2288;
 	return 0;
