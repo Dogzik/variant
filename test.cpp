@@ -25,9 +25,10 @@ struct my_struct
 
 int main() {
 	string a = "absss";
-	variant<int, char, double, string> t;
-
-	t.emplace<string>(8, 'a');
+	string b = "lslff";
+	variant<int, char, double, string> t(a);
+	variant<int, char, double, string> tt(5);
+	swap(t, tt);
 
 	int ppp = 2288;
 	return 0;

@@ -65,6 +65,7 @@ struct variant : move_storage_t<T0, Ts...>
 	using variant_base::set_index;
 	using variant_base::index;
 	using variant_base::reset;
+	using variant_base::construct_from_storage;
 
 	template<size_t I>
 	using type_ind = std::integral_constant<size_t, I>;
@@ -141,9 +142,59 @@ struct variant : move_storage_t<T0, Ts...>
 		constexpr size_t I = get_type_ind<T, T0, Ts...>();
 		return emplace<I>(std::forward<Args>(args)...);
 	}
+
+	void swap(variant& other) 
+		noexcept(std::conjunction_v<std::is_nothrow_move_constructible<Ts>..., std::is_nothrow_move_constructible<T0>,
+				std::is_nothrow_swappable<Ts>..., std::is_nothrow_swappable<T0>>)
+	{
+		static_assert(std::conjunction_v<std::is_move_constructible<Ts>..., std::is_move_constructible<T0>>,
+			"All types have to be move constructible");
+		static_assert(std::conjunction_v<std::is_swappable<Ts>..., std::is_swappable<T0>>,
+			"All types have to be swappable");
+		swap_impl(other);
+	}
+
 private:
-	
+
+	void swap_impl(variant& other)
+	{
+		if (index() != other.index())
+		{
+			variant tmp(std::move(*this));
+			emplace_from(std::move(other));
+			other.emplace_from(std::move(tmp));
+		}
+		else
+		{
+			if (!valueless_by_exception())
+			{
+				swap_storage(index(), *this, other);
+			}
+		}
+	}
+
+	void emplace_from(variant&& other)
+	{
+		if (!valueless_by_exception())
+		{
+			reset(index());
+		}
+		set_index(other.index());
+		if (!other.valueless_by_exception())
+		{
+			construct_from_storage(index(), std::move(other));
+		}
+	}
 };
+
+
+template<typename ... Ts, 
+	std::enable_if_t<std::conjunction_v<std::is_move_constructible<Ts>...>
+					&& std::conjunction_v<std::is_move_constructible<Ts>...>, int> = 0>
+void swap(variant<Ts...>& a, variant<Ts...>& b) noexcept(noexcept(a.swap(b)))
+{
+	a.swap(b);
+}
 
 template <typename X, typename ... Us>
 constexpr bool holds_alternative(const variant<Us...>& v) noexcept
