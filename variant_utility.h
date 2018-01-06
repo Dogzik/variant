@@ -130,6 +130,8 @@ struct no_type;
 template<bool triv_destr, typename ... Ts>
 struct storage {
 	void reset(size_t ind) {};
+	template<typename STORAGE>
+	void construct_from_storage(size_t ind, STORAGE&& other) {}
 };
 
 template<typename ... Ts>
@@ -144,6 +146,7 @@ struct storage<1, T0, Ts...>
 		storage_t<Ts...> tail;
 	};
 
+	storage() noexcept {}
 	storage(storage const&) = default;
 
 	template<typename ... Args>
@@ -169,6 +172,32 @@ struct storage<1, T0, Ts...>
 		}
 	}
 
+	template<typename ... Args>
+	void construct_from_args(size_t ind, Args&& ... args)
+	{
+		if (ind == 0)
+		{
+			new(&head) T0(std::forward<Args>(args)...);
+		}
+		else
+		{
+			tail.construct_from(ind - 1, std::forward<Args>(args)...);
+		}
+	}
+
+	template<typename STORAGE>
+	void construct_from_storage(size_t ind, STORAGE&& other)
+	{
+		if (ind == 0)
+		{
+			new(&head) T0(std::forward<STORAGE>(other).head);
+		}
+		else
+		{
+			tail.construct_from_storage(ind - 1, std::forward<STORAGE>(other).tail);
+		}
+	}
+
 	~storage() noexcept = default;
 };
 
@@ -181,6 +210,9 @@ struct storage<0, T0, Ts...>
 		T0 head;
 		storage_t<Ts...> tail;
 	};
+
+	storage() noexcept {}
+	storage(storage const&) = default;
 
 	template<typename ... Args>
 	constexpr explicit storage(std::integral_constant<size_t, 0>, Args&& ... args) noexcept(std::is_nothrow_constructible_v<T0, Args...>)
@@ -205,36 +237,34 @@ struct storage<0, T0, Ts...>
 		}
 	}
 
+	template<typename ... Args>
+	void construct_from_args(size_t ind, Args&& ... args)
+	{
+		if (ind == 0)
+		{
+			new(&head) T0(std::forward<Args>(args)...);
+		}
+		else
+		{
+			tail.construct_from(ind - 1, std::forward<Args>(args)...);
+		}
+	}
+
+	template<typename STORAGE>
+	void construct_from_storage(size_t ind, STORAGE&& other)
+	{
+		if (ind == 0)
+		{
+			new(&head) T0(std::forward<STORAGE>(other).head);
+		}
+		else
+		{
+			tail.construct_from_storage(ind - 1, std::forward<STORAGE>(other).tail);
+		}
+	}
+
 	~storage() noexcept {}
 };
-
-
-/*template<typename T, typename U, bool f = std::is_const_v<U>>
-struct need_const
-{
-	typedef const T type;
-};
-
-template<typename T, typename U>
-struct need_const<T, U, 0>
-{
-	typedef T type;
-};*/
-
-template<typename T, typename U, bool f = std::is_const_v<U>>
-struct need_const
-{
-	typedef const T type;
-};
-
-template<typename T, typename U>
-struct need_const<T, U, 0>
-{
-	typedef T type;
-};
-
-template<typename T, typename U>
-using need_const_t = typename need_const<T, U>::type;
 
 template<size_t I, typename STORAGE, std::enable_if_t<(I == 0), int> = 0>
 constexpr decltype(auto) raw_get(STORAGE&& st)
@@ -249,7 +279,7 @@ constexpr decltype(auto) raw_get(STORAGE&& st)
 }
 
 template<bool triv_destr, typename ... Ts>
-struct destroyable_storage : protected storage_t<Ts...>
+struct destroyable_storage : storage_t<Ts...>
 {
 protected:
 	using index_t = variant_index_t<sizeof...(Ts)>;
@@ -269,6 +299,7 @@ protected:
 	{}
 
 public:
+	destroyable_storage() noexcept = default;
 	destroyable_storage(destroyable_storage const&) = default;
 
 	constexpr bool valueless_by_exception() const noexcept
@@ -305,7 +336,7 @@ public:
 };
 
 template<typename ... Ts>
-struct destroyable_storage<0, Ts...> : protected storage_t<Ts...>
+struct destroyable_storage<0, Ts...> : storage_t<Ts...>
 {
 protected:
 	using index_t = variant_index_t<sizeof...(Ts)>;
@@ -317,6 +348,7 @@ protected:
 	{
 		cur_type = static_cast<index_t>(ind);
 	}
+
 	template<size_t I, typename ... Args>
 	constexpr explicit destroyable_storage(std::integral_constant<size_t, I>, Args&& ... args)
 		noexcept(std::is_nothrow_constructible_v<base, std::integral_constant<size_t, I>, Args...>)
@@ -325,6 +357,7 @@ protected:
 	{}
 
 public:
+	destroyable_storage() noexcept = default;
 	destroyable_storage(destroyable_storage const&) = default;
 
 	constexpr bool valueless_by_exception() const noexcept
@@ -368,3 +401,34 @@ public:
 
 template<typename ... Ts>
 using destroyable_storage_t = destroyable_storage<std::conjunction_v<std::is_trivially_destructible<Ts>...>, Ts...>;
+
+template<bool copyable, typename ... Ts>
+struct copy_storage : destroyable_storage_t<Ts...>
+{
+	using copy_base = destroyable_storage_t<Ts...>;
+
+	using copy_base::copy_base;
+
+	copy_storage(copy_storage const& other)
+	{
+		copy_base::cur_type = other.cur_type;
+		if (!copy_base::valueless_by_exception())
+		{
+			copy_base::base::construct_from_storage(other.index(), other);
+		}
+	}
+};
+
+
+template<typename ... Ts>
+struct copy_storage<0, Ts...> : copy_storage<1, Ts...>
+{
+	using copy_base = copy_storage<1, Ts...>;
+
+	using copy_base::copy_base;
+
+	copy_storage(copy_storage const&) = delete;
+};
+
+template<typename ... Ts>
+using copy_storage_t = copy_storage<std::conjunction_v<std::is_copy_constructible<Ts>...>, Ts...>;
