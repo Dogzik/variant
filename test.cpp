@@ -28,8 +28,5 @@ int main() {
 	string b = "lslff";
 	variant<int, char, double, string> t(a);
 	variant<int, char, double, string> tt(5);
-	swap(t, tt);
-
-	int ppp = 2288;
 	return 0;
 }

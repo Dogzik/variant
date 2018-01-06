@@ -310,16 +310,18 @@ protected:
 	{
 		cur_type = static_cast<index_t>(ind);
 	}
+
+public:
+	destroyable_storage() = default;
+	destroyable_storage(destroyable_storage const&) = default;
+	destroyable_storage(destroyable_storage&&) = default;
+
 	template<size_t I, typename ... Args>
 	constexpr explicit destroyable_storage(std::integral_constant<size_t, I>, Args&& ... args)
 		noexcept(std::is_nothrow_constructible_v<base, std::integral_constant<size_t, I>, Args...>)
 		: base(std::integral_constant<size_t, I>{}, std::forward<Args>(args)...)
 		, cur_type(static_cast<index_t>(I))
 	{}
-
-public:
-	destroyable_storage() noexcept = default;
-	destroyable_storage(destroyable_storage const&) = default;
 
 	constexpr bool valueless_by_exception() const noexcept
 	{
@@ -355,65 +357,20 @@ public:
 };
 
 template<typename ... Ts>
-struct destroyable_storage<0, Ts...> : storage_t<Ts...>
+struct destroyable_storage<0, Ts...> : destroyable_storage<1, Ts...>
 {
-protected:
-	using index_t = variant_index_t<sizeof...(Ts)>;
-	using base = storage_t<Ts...>;
+	using base = destroyable_storage<1, Ts...>;
 
-	index_t cur_type;
-
-	constexpr void set_index(size_t ind) noexcept
-	{
-		cur_type = static_cast<index_t>(ind);
-	}
-
-	template<size_t I, typename ... Args>
-	constexpr explicit destroyable_storage(std::integral_constant<size_t, I>, Args&& ... args)
-		noexcept(std::is_nothrow_constructible_v<base, std::integral_constant<size_t, I>, Args...>)
-		: base(std::integral_constant<size_t, I>{}, std::forward<Args>(args)...)
-		, cur_type(static_cast<index_t>(I))
-	{}
-
-public:
-	destroyable_storage() noexcept = default;
+	using base::base;
+	destroyable_storage() = default;
 	destroyable_storage(destroyable_storage const&) = default;
-
-	constexpr bool valueless_by_exception() const noexcept
-	{
-		return index() == variant_npos;
-	}
-
-	constexpr size_t index() const noexcept
-	{
-		return static_cast<size_t>(cur_type);
-	}
-
-	constexpr base& get_storage() & noexcept
-	{
-		return *this;
-	}
-
-	constexpr const base& get_storage() const & noexcept
-	{
-		return *this;
-	}
-
-	constexpr base&& get_storage() && noexcept
-	{
-		return std::move(*this);
-	}
-
-	constexpr const base&& get_storage() const && noexcept
-	{
-		return std::move(*this);
-	}
+	destroyable_storage(destroyable_storage&&) = default;
 
 	~destroyable_storage() noexcept
 	{
-		if (!valueless_by_exception())
+		if (!base::valueless_by_exception())
 		{
-			base::reset(index());
+			base::reset(base::index());
 		}
 	}
 };
@@ -427,9 +384,7 @@ struct copy_storage : destroyable_storage_t<Ts...>
 	using copy_base = destroyable_storage_t<Ts...>;
 
 	using copy_base::copy_base;
-
 	copy_storage() = default;
-
 	copy_storage(copy_storage const& other)
 	{
 		copy_base::cur_type = other.cur_type;
@@ -438,6 +393,7 @@ struct copy_storage : destroyable_storage_t<Ts...>
 			copy_base::base::construct_from_storage(other.index(), other);
 		}
 	}
+	copy_storage(copy_storage&&) = default;
 };
 
 
@@ -447,10 +403,9 @@ struct copy_storage<0, Ts...> : copy_storage<1, Ts...>
 	using copy_base = copy_storage<1, Ts...>;
 
 	using copy_base::copy_base;
-
 	copy_storage() = default;
-
 	copy_storage(copy_storage const&) = delete;
+	copy_storage(copy_storage&&) = default;
 };
 
 template<typename ... Ts>
@@ -462,9 +417,8 @@ struct move_storage : copy_storage_t<Ts...>
 	using move_base = copy_storage_t<Ts...>;
 	
 	using move_base::move_base;
-
+	move_storage() = default;
 	move_storage(move_storage const&) = default;
-
 	move_storage(move_storage&& other) noexcept(noexcept(move_base::construct_from_storage(other.index(), std::move(other))))
 	{
 		move_base::cur_type = other.cur_type;
@@ -481,11 +435,11 @@ struct move_storage<0, Ts...> : move_storage<1, Ts...>
 	using move_base = move_storage<1, Ts...>;
 
 	using move_base::move_base;
-
+	move_storage() = default;
 	move_storage(move_storage const&) = default;
-
 	move_storage(move_storage&&) = delete;
 };
 
 template<typename ... Ts>
 using move_storage_t = move_storage<std::conjunction_v<std::is_move_constructible<Ts>...>, Ts...>;
+
