@@ -24,9 +24,12 @@ struct my_struct
 
 
 int main() {
-	string a = "absss";
-	string b = "lslff";
-	variant<int, char, double, string> t(a);
-	variant<int, char, double, string> tt(5);
+	//string a = "absss";
+	//string b = "lslff";
+	variant<int, char> t(5);
+	variant<char, double> tt(3.22);
+
+	//cout << variant_size_v<decltype(t)>;
+	visit([](auto a, auto b) { cout << a << " " << b << endl; }, t, tt);
 	return 0;
 }

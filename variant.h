@@ -1,7 +1,11 @@
 #pragma once
 #include "variant_utility.h"
 
+
 template <typename T0, typename ... Ts> struct variant;
+
+template <typename Visitor, typename ... Variants>
+constexpr decltype(auto) visit(Visitor&& vis, Variants&& ... vars);
 
 template<size_t I, typename T, char f = 2>
 struct variant_alternative;
@@ -48,7 +52,7 @@ template <typename T>
 struct variant_size<const T> : variant_size<T> {};
 
 template <typename T, typename ... Ts>
-struct variant_size<variant<T, Ts...>> : std::integral_constant<size_t, sizeof...(Ts)+1> {};
+struct variant_size<variant<T, Ts...>> : std::integral_constant<size_t, sizeof...(Ts) + 1> {};
 
 template <typename T>
 inline constexpr size_t variant_size_v = variant_size<T>::value;
@@ -314,4 +318,132 @@ constexpr decltype(auto) get_if(variant<Ts...> const* pv) noexcept
 	constexpr size_t I = get_type_ind<T, Ts...>();
 	static_assert(is_unique_v<T, Ts...>, "T has to be unique varriant alternative");
 	return get_if<I>(pv);
+}
+
+
+template<typename T, size_t ... dimens>
+struct multi_array
+{
+	constexpr const T& access() const
+	{
+		return data;
+	}
+	T data;
+
+	constexpr multi_array() = default;
+	constexpr multi_array(multi_array const&) = default;
+	constexpr multi_array(multi_array&&) = default;
+	constexpr multi_array& operator=(multi_array const&) = default;
+	constexpr multi_array& operator=(multi_array&&) = default;
+};
+
+
+template<typename T, size_t first_dim, size_t ... rest_dims>
+struct multi_array<T, first_dim, rest_dims...>
+{
+	template<typename ... size_ts>
+	constexpr const T& access(size_t first_ind, size_ts ... other_inds) const
+	{
+		return data_arr[first_ind].access(other_inds...);
+	}
+
+	multi_array<T, rest_dims...> data_arr[first_dim];
+
+	constexpr multi_array() = default;
+	constexpr multi_array(multi_array const&) = default;
+	constexpr multi_array(multi_array&&) = default;
+	constexpr multi_array& operator=(multi_array const&) = default;
+	constexpr multi_array& operator=(multi_array&&) = default;
+};
+
+template<typename ... Ts>
+struct many_vars;
+
+template<size_t I, typename T, typename ... Ts>
+struct get_ith_type
+{
+	typedef typename get_ith_type<I - 1, Ts...>::type type;
+};
+
+template<typename T, typename ... Ts>
+struct get_ith_type<0, T, Ts...>
+{
+	typedef T type;
+};
+
+template<size_t I, typename ... Ts>
+using get_ith_type_t = typename get_ith_type<I, Ts...>::type;
+
+template<typename arr_type, typename varians, typename idex_seq, bool f>
+struct table_impl;
+
+template<typename ret, typename vis, typename ... vars, size_t ... dims, size_t ... inds>
+struct table_impl<multi_array<ret (*)(vis, vars...), dims...>, many_vars<vars...>, std::index_sequence<inds...>, 0>
+{
+	using cur_var = get_ith_type_t<sizeof...(inds), std::decay_t<vars>...>;
+
+	using arr_type = multi_array<ret(*)(vis, vars...), dims...>;
+
+	static constexpr arr_type make_table()
+	{
+		arr_type table{};
+		apply_all(table, std::make_index_sequence<variant_size_v<cur_var>>());
+		return table;
+	}
+
+	template<size_t ... var_inds>
+	static constexpr void apply_all(arr_type& table, std::index_sequence<var_inds...>)
+	{
+		(apply_one<var_inds>(table.data_arr[var_inds]), ...);
+	}
+
+	template<size_t ind, typename arr>
+	static constexpr void apply_one(arr& table)
+	{
+		table = table_impl<std::remove_reference_t<decltype(table)>, many_vars<vars...>, std::index_sequence<ind, inds...>, (sizeof...(dims) == 1)>::make_table();
+	}
+};
+
+template<typename ret, typename vis, typename ... vars, size_t ... inds>
+struct table_impl<multi_array<ret(*)(vis, vars...)>, many_vars<vars...>, std::index_sequence<inds...>, 1>
+{
+	using arr_type = multi_array<ret(*)(vis, vars...)>;
+
+	static constexpr decltype(auto) invoke(vis visitor, vars ... variants)
+	{
+		return std::forward<vis>(visitor)(get<inds>(std::forward<vars>(variants))...);
+	}
+
+	static constexpr arr_type make_table()
+	{
+		return arr_type{ &invoke };
+	}
+};
+
+template<typename ret, typename vis, typename ... vars>
+struct gen_table
+{
+	using func_ptr = ret(*)(vis, vars...);
+
+	using arr_type = multi_array<func_ptr, variant_size_v<std::remove_reference_t<vars>>...>;
+
+	static constexpr arr_type table = table_impl<arr_type, many_vars<vars...>, std::index_sequence<>, (sizeof...(vars) == 0)>::make_table();
+
+};
+
+template<typename Visitor, typename ... Variants>
+constexpr decltype(auto) visit(Visitor&& vis, Variants&& ... vars)
+{
+	if ((vars.valueless_by_exception() || ...))
+	{
+		throw bad_variant_access();
+	}
+
+	using ret_type = decltype(std::forward<Visitor>(vis)(get<0>(std::forward<Variants>(vars))...));
+
+	constexpr auto& v_table = gen_table<ret_type, Visitor&&, Variants&&...>::table;
+	auto func_ptr = v_table.access(vars.index()...);
+
+	return (*func_ptr)(std::forward<Visitor>(vis), std::forward<Variants>(vars)...);
+	//return 2;
 }
