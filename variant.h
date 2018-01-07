@@ -172,7 +172,19 @@ private:
 		{
 			if (!valueless_by_exception())
 			{
-				swap_storage(index(), *this, other);
+				//swap_storage(index(), *this, other);
+				auto swapper = [](auto&& a, auto && b) -> void
+				{
+					if constexpr(std::is_same_v<decltype(a), decltype(b)>)
+					{
+						std::swap(a, b);
+					}
+					else
+					{
+						return;
+					}
+				};
+				visit(swapper, *this, other);
 			}
 		}
 	}
@@ -329,12 +341,6 @@ struct multi_array
 		return data;
 	}
 	T data;
-
-	constexpr multi_array() = default;
-	constexpr multi_array(multi_array const&) = default;
-	constexpr multi_array(multi_array&&) = default;
-	constexpr multi_array& operator=(multi_array const&) = default;
-	constexpr multi_array& operator=(multi_array&&) = default;
 };
 
 
@@ -348,12 +354,6 @@ struct multi_array<T, first_dim, rest_dims...>
 	}
 
 	multi_array<T, rest_dims...> data_arr[first_dim];
-
-	constexpr multi_array() = default;
-	constexpr multi_array(multi_array const&) = default;
-	constexpr multi_array(multi_array&&) = default;
-	constexpr multi_array& operator=(multi_array const&) = default;
-	constexpr multi_array& operator=(multi_array&&) = default;
 };
 
 template<typename ... Ts>
@@ -374,38 +374,37 @@ struct get_ith_type<0, T, Ts...>
 template<size_t I, typename ... Ts>
 using get_ith_type_t = typename get_ith_type<I, Ts...>::type;
 
-template<typename arr_type, typename varians, typename idex_seq, bool f>
+template<typename arr_type, typename varians, typename idex_seq>
 struct table_impl;
 
-template<typename ret, typename vis, typename ... vars, size_t ... dims, size_t ... inds>
-struct table_impl<multi_array<ret (*)(vis, vars...), dims...>, many_vars<vars...>, std::index_sequence<inds...>, 0>
+template<typename ret, typename vis, typename ... vars, size_t dim_first, size_t ... dim_rest, size_t ... inds>
+struct table_impl<multi_array<ret (*)(vis, vars...), dim_first, dim_rest...>, many_vars<vars...>, std::index_sequence<inds...>>
 {
 	using cur_var = get_ith_type_t<sizeof...(inds), std::decay_t<vars>...>;
 
-	using arr_type = multi_array<ret(*)(vis, vars...), dims...>;
+	using arr_type = multi_array<ret(*)(vis, vars...), dim_first, dim_rest...>;
 
 	static constexpr arr_type make_table()
 	{
-		arr_type table{};
-		apply_all(table, std::make_index_sequence<variant_size_v<cur_var>>());
-		return table;
+		return make_many(std::make_index_sequence<variant_size_v<cur_var>>{});
 	}
 
 	template<size_t ... var_inds>
-	static constexpr void apply_all(arr_type& table, std::index_sequence<var_inds...>)
+	static constexpr arr_type make_many(std::index_sequence<var_inds...>)
 	{
-		(apply_one<var_inds>(table.data_arr[var_inds]), ...);
+		using smaller_arr = multi_array<ret(*)(vis, vars...), dim_rest...>;
+		return arr_type{ make_one<var_inds, smaller_arr>()... };
 	}
 
 	template<size_t ind, typename arr>
-	static constexpr void apply_one(arr& table)
+	static constexpr arr make_one()
 	{
-		table = table_impl<std::remove_reference_t<decltype(table)>, many_vars<vars...>, std::index_sequence<ind, inds...>, (sizeof...(dims) == 1)>::make_table();
+		return table_impl<arr, many_vars<vars...>, std::index_sequence<inds..., ind>>::make_table();
 	}
 };
 
 template<typename ret, typename vis, typename ... vars, size_t ... inds>
-struct table_impl<multi_array<ret(*)(vis, vars...)>, many_vars<vars...>, std::index_sequence<inds...>, 1>
+struct table_impl<multi_array<ret(*)(vis, vars...)>, many_vars<vars...>, std::index_sequence<inds...>>
 {
 	using arr_type = multi_array<ret(*)(vis, vars...)>;
 
@@ -416,7 +415,7 @@ struct table_impl<multi_array<ret(*)(vis, vars...)>, many_vars<vars...>, std::in
 
 	static constexpr arr_type make_table()
 	{
-		return arr_type{ &invoke };
+		return arr_type{ & invoke };
 	}
 };
 
@@ -427,7 +426,7 @@ struct gen_table
 
 	using arr_type = multi_array<func_ptr, variant_size_v<std::remove_reference_t<vars>>...>;
 
-	static constexpr arr_type table = table_impl<arr_type, many_vars<vars...>, std::index_sequence<>, (sizeof...(vars) == 0)>::make_table();
+	static constexpr arr_type table = table_impl<arr_type, many_vars<vars...>, std::index_sequence<>>::make_table();
 
 };
 
@@ -445,5 +444,4 @@ constexpr decltype(auto) visit(Visitor&& vis, Variants&& ... vars)
 	auto func_ptr = v_table.access(vars.index()...);
 
 	return (*func_ptr)(std::forward<Visitor>(vis), std::forward<Variants>(vars)...);
-	//return 2;
 }
