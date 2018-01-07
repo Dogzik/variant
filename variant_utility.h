@@ -443,3 +443,22 @@ struct move_storage<0, Ts...> : move_storage<1, Ts...>
 template<typename ... Ts>
 using move_storage_t = move_storage<std::conjunction_v<std::is_move_constructible<Ts>...>, Ts...>;
 
+auto comparer = [](auto&& action) constexpr {
+	return ([action](auto&& a, auto&& b) constexpr -> bool  {
+		if constexpr(std::is_same_v<decltype(a), decltype(b)>)
+		{
+			return action(a, b);
+		}
+		else
+		{
+			return 0;
+		}
+	});
+};
+
+auto less = comparer([](auto&& x, auto&& y) constexpr -> bool  {return x < y; });
+auto greater = comparer([](auto&& x, auto&& y) constexpr -> bool  {return x > y; });
+auto equal = comparer([](auto&& x, auto&& y) constexpr -> bool  {return x == y; });
+auto neq = comparer([](auto&& x, auto&& y) constexpr -> bool  {return x != y; });
+auto leq = comparer([](auto&& x, auto&& y) constexpr -> bool  {return x <= y});
+auto geq = comparer([](auto&& x, auto&& y) constexpr -> bool  {return x >= y});

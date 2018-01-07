@@ -18,11 +18,17 @@ int main() {
 	variant<int, double, string> t(a);
 	variant<int, double, string> tt(3.22);
 
+	cout << (t < tt) << endl;
+
 	visit([](auto&& a, auto&& b) { cout << a << " " << b <<  endl; }, t, tt);
 
 	auto w = visit([](auto&& arg)->variant<int, double, string> { return arg + arg; }, t);
 	auto ww = visit([](auto&& arg)->variant<int, double, string> { return arg + arg; }, tt);
 
 	visit([](auto&& a, auto&& b) { cout << a << " " << b << endl; }, w, ww);
+
+	cout << (tt < ww) << endl;
+
+	std::enable_if_t<less(1, 2), int> x = 15;
 	return 0;
 }

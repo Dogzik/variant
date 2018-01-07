@@ -445,3 +445,119 @@ constexpr decltype(auto) visit(Visitor&& vis, Variants&& ... vars)
 
 	return (*func_ptr)(std::forward<Visitor>(vis), std::forward<Variants>(vars)...);
 }
+
+template <typename ... Ts>
+constexpr bool operator==(const variant<Ts...>& v, const variant<Ts...>& w)
+{
+	if (v.index() != w.index())
+	{
+		return 0;
+	}
+	if (v.valueless_by_exception())
+	{
+		return 1;
+	}
+	return visit(equal, v, w);
+}
+
+template <typename ... Ts>
+constexpr bool operator!=(const variant<Ts...>& v, const variant<Ts...>& w)
+{
+	if (v.index() != w.index())
+	{
+		return 1;
+	}
+	if (v.valueless_by_exception())
+	{
+		return 0;
+	}
+	return visit(neq, v, w);
+}
+
+template <typename ... Ts>
+constexpr bool operator<(const variant<Ts...>& v, const variant<Ts...>& w)
+{
+	if (w.valueless_by_exception())
+	{
+		return 0;
+	}
+	if (v.valueless_by_exception())
+	{
+		return 1;
+	}
+	if (v.index() == w.index())
+	{
+		return  visit(less, v, w);
+	}
+	else
+	{
+		return v.index() < w.index();
+
+	}
+}
+
+template <typename ... Ts>
+constexpr bool operator>(const variant<Ts...>& v, const variant<Ts...>& w)
+{
+	if (v.valueless_by_exception())
+	{
+		return 0;
+	}
+	if (w.valueless_by_exception())
+	{
+		return 1;
+	}
+	if (v.index() == w.index())
+	{
+		return visit(greater, v, w);;
+	}
+	else
+	{
+		return v.index() > w.index();
+
+	}
+}
+
+template <typename ... Ts>
+constexpr bool operator<=(const variant<Ts...>& v, const variant<Ts...>& w)
+{
+	if (v.valueless_by_exception())
+	{
+		return 1;
+	}
+	if (w.valueless_by_exception())
+	{
+		return 0;
+	}
+	if (v.index() == w.index())
+	{
+		return  visit(leq, v, w);
+	}
+	else
+	{
+		return v.index() < w.index();
+
+	}
+}
+
+template <typename ... Ts>
+constexpr bool operator>=(const variant<Ts...>& v, const variant<Ts...>& w)
+{
+	if (w.valueless_by_exception())
+	{
+		return 1;
+	}
+	if (v.valueless_by_exception())
+	{
+		return 0;
+	}
+	if (v.index() == w.index())
+	{
+		return visit(geq, v, w);
+	}
+	else
+	{
+		return v.index() < w.index();
+
+	}
+}
