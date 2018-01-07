@@ -131,8 +131,15 @@ struct no_type;
 template<bool triv_destr, typename ... Ts>
 struct storage {
 	void reset(size_t ind) {};
+
 	template<typename STORAGE>
 	void construct_from_storage(size_t ind, STORAGE&& other) {}
+
+	template<typename STORAGE>
+	void assign_from_storage(size_t ind, STORAGE&& other) {}
+
+	template<typename T>
+	void assign_from(size_t ind, T&& other) {}
 };
 
 template<typename ... Ts>
@@ -188,7 +195,6 @@ struct storage<1, T0, Ts...>
 
 	template<typename STORAGE>
 	void construct_from_storage(size_t ind, STORAGE&& other)
-		noexcept(std::is_nothrow_move_constructible_v<T0> && std::is_nothrow_move_constructible_v<storage_t<Ts...>>)
 	{
 		if (ind == 0)
 		{
@@ -197,6 +203,32 @@ struct storage<1, T0, Ts...>
 		else
 		{
 			tail.construct_from_storage(ind - 1, std::forward<STORAGE>(other).tail);
+		}
+	}
+
+	template<typename STORAGE>
+	void assign_from_storage(size_t ind, STORAGE&& other)
+	{
+		if (ind == 0)
+		{
+			head = std::forward<STORAGE>(other).head;
+		}
+		else
+		{
+			tail.assign_from_storage(ind - 1, std::forward<STORAGE>(other).tail);
+		}
+	}
+
+	template<typename T>
+	void assign_from(size_t ind, T&& other)
+	{
+		if (ind == 0)
+		{
+			head = std::forward<T>(other);
+		}
+		else
+		{
+			tail.assign_from_storage(ind - 1, std::forward<T>(other));
 		}
 	}
 
@@ -254,7 +286,6 @@ struct storage<0, T0, Ts...>
 
 	template<typename STORAGE>
 	void construct_from_storage(size_t ind, STORAGE&& other) 
-		noexcept(std::is_nothrow_move_constructible_v<T0> && std::is_nothrow_move_constructible_v<storage_t<Ts...>>)
 	{
 		if (ind == 0)
 		{
@@ -263,6 +294,32 @@ struct storage<0, T0, Ts...>
 		else
 		{
 			tail.construct_from_storage(ind - 1, std::forward<STORAGE>(other).tail);
+		}
+	}
+
+	template<typename STORAGE>
+	void assign_from_storage(size_t ind, STORAGE&& other)
+	{
+		if (ind == 0)
+		{
+			head = std::forward<STORAGE>(other).head;
+		}
+		else
+		{
+			tail.assign_from_storage(ind - 1, std::forward<STORAGE>(other).tail);
+		}
+	}
+
+	template<typename T>
+	void assign_from(size_t ind, T&& other)
+	{
+		if (ind == 0)
+		{
+			head = std::forward<T>(other);
+		}
+		else
+		{
+			tail.assign_from_storage(ind - 1, std::forward<T>(other));
 		}
 	}
 
@@ -419,7 +476,7 @@ struct move_storage : copy_storage_t<Ts...>
 	using move_base::move_base;
 	move_storage() = default;
 	move_storage(move_storage const&) = default;
-	move_storage(move_storage&& other) noexcept(noexcept(move_base::construct_from_storage(other.index(), std::move(other))))
+	move_storage(move_storage&& other) noexcept(std::conjunction_v<std::is_nothrow_move_constructible<Ts>...>)
 	{
 		move_base::cur_type = other.cur_type;
 		if (!move_base::valueless_by_exception())
@@ -442,6 +499,142 @@ struct move_storage<0, Ts...> : move_storage<1, Ts...>
 
 template<typename ... Ts>
 using move_storage_t = move_storage<std::conjunction_v<std::is_move_constructible<Ts>...>, Ts...>;
+
+
+template<bool move_assign, typename ... Ts>
+struct move_assign_storage : move_storage_t<Ts...>
+{
+	using move_assign_base = move_storage_t<Ts...>;
+
+	using move_assign_base::move_assign_base;
+	using move_assign_base::valueless_by_exception;
+	using move_assign_base::reset;
+	using move_assign_base::index;
+	using move_assign_base::set_index;
+	using move_assign_base::construct_from_storage;
+	using move_assign_base::assign_from_storage;
+
+	void smart_reset() noexcept
+	{
+		if (!valueless_by_exception())
+		{
+			reset(index());
+		}
+		set_index(variant_npos);
+	}
+
+
+	move_assign_storage() = default;
+	move_assign_storage(move_assign_storage const&) = default;
+	move_assign_storage(move_assign_storage&& other) = default;
+	move_assign_storage& operator=(move_assign_storage&& other) noexcept(std::conjunction_v<std::is_nothrow_move_constructible<Ts>..., std::is_nothrow_move_assignable<Ts>...>)
+	{
+		if (other.valueless_by_exception())
+		{
+			smart_reset();
+		}
+		else
+		{
+			if (index() == other.index())
+			{
+				assign_from_storage(index(), std::move(other));
+			}
+			else
+			{
+				smart_reset();
+				set_index(other.index());
+				try
+				{
+					construct_from_storage(index(), std::move(other));
+				}
+				catch (...)
+				{
+					set_index(variant_npos);
+				}
+			}
+		}
+		return *this;
+	}
+};
+
+template<typename ... Ts>
+struct move_assign_storage<0, Ts...> : move_assign_storage<1, Ts...>
+{
+	using move_assign_base = move_assign_storage<1, Ts...>;
+
+	using move_assign_base::move_assign_base;
+	move_assign_storage() = default;
+	move_assign_storage(move_assign_storage const&) = default;
+	move_assign_storage(move_assign_storage&& other) = default;
+	move_assign_storage& operator=(move_assign_storage&& other) = delete;
+};
+
+template<typename ... Ts>
+using move_assign_storage_t = move_assign_storage<std::conjunction_v<std::is_move_constructible<Ts>..., std::is_move_assignable<Ts>...>, Ts...>;
+
+template<bool copy_assign, typename ... Ts>
+struct copy_assign_storage : move_assign_storage_t<Ts...>
+{
+	using copy_assign_base = move_assign_storage_t<Ts...>;
+
+	using copy_assign_base::copy_assign_base;
+	using copy_assign_base::index;
+	using copy_assign_base::set_index;
+	using copy_assign_base::smart_reset;
+	using copy_assign_base::assign_from_storage;
+	using copy_assign_base::construct_from_storage;
+
+	copy_assign_storage() = default;
+	copy_assign_storage(copy_assign_storage const&) = default;
+	copy_assign_storage(copy_assign_storage&& other) = default;
+	copy_assign_storage& operator=(copy_assign_storage&& other) = default;
+	copy_assign_storage& operator=(copy_assign_storage const& other)
+	{
+		if (other.valueless_by_exception())
+		{
+			smart_reset();
+		}
+		else
+		{
+			if (index() == other.index())
+			{
+				assign_from_storage(index(), other);
+			}
+			else
+			{
+				smart_reset();
+				try
+				{
+					set_index(other.index());
+					construct_from_storage(index(), other);
+				} 
+				catch (...)
+				{
+					set_index(variant_npos);
+					return this->operator=(copy_assign_storage(other));
+				}
+			}
+		}
+		return *this;
+	}
+};
+
+template<typename ... Ts>
+struct copy_assign_storage<0, Ts...> : copy_assign_storage<1, Ts...>
+{
+	using copy_assign_base = copy_assign_storage<1, Ts...>;
+
+	using copy_assign_base::copy_assign_base;
+
+	copy_assign_storage() = default;
+	copy_assign_storage(copy_assign_storage const&) = default;
+	copy_assign_storage(copy_assign_storage&& other) = default;
+	copy_assign_storage& operator=(copy_assign_storage&& other) = default;
+	copy_assign_storage& operator=(copy_assign_storage const& other) = delete;
+};
+
+template<typename ... Ts>
+using copy_assign_storage_t = copy_assign_storage<std::conjunction_v<std::is_copy_constructible<Ts>..., std::is_copy_assignable<Ts>...>, Ts...>;
 
 auto comparer = [](auto&& action) constexpr {
 	return ([action](auto&& a, auto&& b) constexpr -> bool  {

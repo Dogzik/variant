@@ -61,15 +61,16 @@ template <typename X, typename ... Us>
 constexpr bool holds_alternative(const variant<Us...>& v) noexcept;
 
 template <typename T0, typename ... Ts>
-struct variant : move_storage_t<T0, Ts...>
+struct variant : copy_assign_storage_t<T0, Ts...>
 {
-	using variant_base = move_storage_t<T0, Ts...>;
+	using variant_base = copy_assign_storage_t<T0, Ts...>;
 
 	using variant_base::valueless_by_exception;
 	using variant_base::set_index;
 	using variant_base::index;
 	using variant_base::reset;
 	using variant_base::construct_from_storage;
+	using variant_base::assign_from;
 
 	template<size_t I>
 	using type_ind = std::integral_constant<size_t, I>;
@@ -115,7 +116,9 @@ struct variant : move_storage_t<T0, Ts...>
 
 	variant(const variant&) = default;
 	variant(variant&&) = default;
-	~variant() noexcept = default;
+
+	variant& operator=(variant const&) = default;
+	variant& operator=(variant&&) = default;
 
 	template <size_t I, typename ... Args,
 			std::enable_if_t<(I < (sizeof...(Ts) + 1)) 
@@ -147,6 +150,31 @@ struct variant : move_storage_t<T0, Ts...>
 		return emplace<I>(std::forward<Args>(args)...);
 	}
 
+	template<typename T, typename TT = type_choser_t<T, T0, Ts...>,
+		std::enable_if_t<is_unique_v<TT, T0, Ts...>
+		&& std::is_constructible_v<TT, T>
+		&& std::is_assignable_v<TT&, T>, int> = 0>
+	variant& operator=(T&& t) noexcept(std::is_nothrow_assignable_v<TT&, T> && std::is_nothrow_constructible_v<TT, T>)
+	{
+		constexpr size_t I = get_type_ind<TT, T0, Ts...>();
+		if (index() == I)
+		{
+			get<I>(*this) = std::forward<T>(t);
+		}
+		else
+		{
+			if constexpr(std::is_nothrow_constructible_v<TT, T> || !std::is_nothrow_move_constructible_v<TT>)
+			{
+				this->emplace<I>(std::forward<T>(t));
+			}
+			else
+			{
+				return this->operator=(variant(std::forward<T>(t)));
+			}
+		}
+		return *this;
+	}
+
 	void swap(variant& other) 
 		noexcept(std::conjunction_v<std::is_nothrow_move_constructible<Ts>..., std::is_nothrow_move_constructible<T0>,
 				std::is_nothrow_swappable<Ts>..., std::is_nothrow_swappable<T0>>)
@@ -158,8 +186,8 @@ struct variant : move_storage_t<T0, Ts...>
 		swap_impl(other);
 	}
 
+	~variant() noexcept = default;
 private:
-
 	void swap_impl(variant& other)
 	{
 		if (index() != other.index())
@@ -487,7 +515,7 @@ constexpr bool operator<(const variant<Ts...>& v, const variant<Ts...>& w)
 	}
 	if (v.index() == w.index())
 	{
-		return  visit(less, v, w);
+		return visit(less, v, w);
 	}
 	else
 	{

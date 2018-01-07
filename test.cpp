@@ -29,6 +29,10 @@ int main() {
 
 	cout << (tt < ww) << endl;
 
-	std::enable_if_t<less(1, 2), int> x = 15;
+	variant<int, double, string> q;
+	q = t;
+	get<string>(t) = "kekek";
+
+	tt = "lololo";
 	return 0;
 }
