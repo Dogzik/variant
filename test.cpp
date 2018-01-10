@@ -1,9 +1,7 @@
 #include <iostream>
-#include <variant>
 #include <vector>
 #include <string>
 #include "variant.h"
-#include "vld.h"
 using std::vector;
 using std::string;
 using std::cin;

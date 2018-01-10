@@ -8,7 +8,6 @@
 #include <limits>
 #include <algorithm>
 
-
 struct monostate {};
 
 constexpr bool operator<(monostate, monostate) noexcept { return false; }
@@ -126,7 +125,6 @@ using variant_index_t = std::conditional_t<(CNT < static_cast<size_t>(std::numer
 						std::conditional_t<(CNT < static_cast<size_t>(std::numeric_limits<short>::max())), short, int>>;
 
 struct no_type;
-
 
 template<bool triv_destr, typename ... Ts>
 struct storage {
@@ -325,22 +323,6 @@ struct storage<0, T0, Ts...>
 
 	~storage() noexcept {}
 };
-
-//template<typename ... Ts>
-//void swap_storage(size_t ind, storage_t<Ts...>& a, storage_t<Ts...>& b)
-//{
-//	if (ind == 0)
-//	{
-//		std::swap(a.head, b.head);
-//	}
-//	else
-//	{
-//		swap_storage(ind - 1, a.tail, b.tail);
-//	}
-//}
-//
-//template<>
-//void swap_storage<>(size_t ind, storage_t<>& a, storage_t<>& b) {}
 
 template<size_t I, typename STORAGE, std::enable_if_t<(I == 0), int> = 0>
 constexpr decltype(auto) raw_get(STORAGE&& st)

@@ -200,7 +200,6 @@ private:
 		{
 			if (!valueless_by_exception())
 			{
-				//swap_storage(index(), *this, other);
 				auto swapper = [](auto&& a, auto && b) -> void
 				{
 					if constexpr(std::is_same_v<decltype(a), decltype(b)>)
